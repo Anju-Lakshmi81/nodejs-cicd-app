@@ -1,0 +1,31 @@
+name: CI/CD Node App
+
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+
+      - name: Deploy to EC2 via SSH
+        uses: appleboy/ssh-action@v0.1.7
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            set -e
+            cd ~/nodejs-cicd-app || exit 1
+            git fetch --all
+            git reset --hard origin/main
+            # stop & remove old container if exists
+            sudo docker stop nodeapp || true
+            sudo docker rm nodeapp || true
+            # build and run the new image (keeps app listening on 3005 inside container)
+            sudo docker build -t mynodeapp:ci .
+            sudo docker run -d -p 80:3005 --name nodeapp mynodeapp:ci
